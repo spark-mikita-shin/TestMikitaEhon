@@ -284,8 +284,9 @@ function route(){
   for (const x of ['vHome', 'vEdit', 'vPlay']) $('#' + x).hidden = true;
   if (v !== 'play'){
     releaseWake();
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     pl = null;
+    if (document.fullscreenElement && !wantLand()) document.exitFullscreen().catch(() => {});
+    else applyOrientation(false);
   }
   const b = findBook(id);
   if (v === 'edit' && b) showEdit(b);
@@ -305,7 +306,7 @@ function showHome(){
   v.replaceChildren(...[
     el('header', {class: 'home-head'},
       el('div', {class: 'brand'}, el('img', {src: './icon-192.png', alt: ''}), el('h1', {}, 'えほんアプリ')),
-      el('button', {class: 'icon-btn', onclick: openSettings, 'aria-label': 'せってい'}, 'せってい')),
+      el('div', {class: 'head-r'}, orientBtn(), el('button', {class: 'icon-btn', onclick: openSettings, 'aria-label': 'せってい'}, 'せってい'))),
     el('div', {class: 'mode-switch'},
       el('button', {class: mode === 'play' ? 'on' : '', onclick: () => { setPref('mode', 'play'); showHome(); }}, '▶ よむ（さいせい）'),
       el('button', {class: mode === 'edit' ? 'on' : '', onclick: () => { setPref('mode', 'edit'); showHome(); }}, '✎ つくる（へんしゅう）')),
@@ -711,11 +712,15 @@ function showEdit(b){
 }
 function renderEdit(){
   const b = ed.book, y = window.scrollY;
+  const colY = [...document.querySelectorAll('#vEdit .ed-col')].map(c => c.scrollTop);
+  const pe = b.pages.length ? pageEditor(b, b.pages[ed.sel]) : [el('p', {class: 'empty'}, 'ページが ありません。「＋ ページ」で ふやしましょう。')];
   $('#vEdit').replaceChildren(
     el('header', {class: 'ed-head'},
       el('button', {class: 'icon-btn', onclick: () => go('#/')}, '‹ もどる'),
       el('input', {class: 'title-input', value: b.title, placeholder: 'えほんの タイトル', oninput: e => { b.title = e.target.value; saveBook(b); }}),
+      orientBtn(),
       el('button', {class: 'btn small fill', onclick: () => go('#/play/' + b.id)}, '▶ よむ')),
+    el('div', {class: 'ed-grid'}, el('div', {class: 'ed-col'},
     bookSettingsCard(b),
     el('section', {class: 'card'}, el('h3', {}, 'ページ'),
       el('div', {class: 'strip'},
@@ -724,9 +729,10 @@ function renderEdit(){
         el('button', {class: 'strip-add', onclick: () => { b.pages.splice(ed.sel + 1, 0, newPage()); ed.sel = b.pages.length > 1 ? ed.sel + 1 : 0; saveBook(b); renderEdit(); }}, '＋\nページ')),
       el('div', {class: 'row-btns'}, el('button', {class: 'btn small fill', onclick: () => bulkPhotos(b)}, 'しゃしんを まとめて えらぶ')),
       el('p', {class: 'note'}, 'えらんだ じゅんばんに、1ページめから しゃしんが はいります。たりない ぶんの ページは じどうで ふえます。')),
-    b.pages.length ? pageEditor(b, b.pages[ed.sel]) : el('p', {class: 'empty'}, 'ページが ありません。「＋ ページ」で ふやしましょう。')
+    pe[0]), el('div', {class: 'ed-col'}, pe.slice(1)))
   );
   window.scrollTo(0, y);
+  document.querySelectorAll('#vEdit .ed-col').forEach((c, k) => { if (colY[k] != null) c.scrollTop = colY[k]; });
   const on = $('#vEdit .strip-page.on'); if (on) on.scrollIntoView({inline: 'nearest', block: 'nearest'});
 }
 function bookSettingsCard(b){
@@ -894,7 +900,7 @@ function pageEditor(b, p){
   }
   drawCards();
 
-  return el('section', {class: 'card'},
+  return [el('section', {class: 'card'},
     el('div', {class: 'pe-head'}, el('h3', {}, `${i + 1} ページめ`), el('button', {class: 'icon-btn', onclick: () => pageMenu(b, i)}, '⋯ ページの そうさ')),
     el('div', {class: 'pe-pic' + (p.mediaId ? '' : ' empty-pic'), style: 'margin-top:10px', role: 'button', onclick: () => choosePhoto(b, p)},
       pictureNode(p), p.mediaId ? null : el('div', {class: 'pick-hint'}, el('b', {}, '＋'), 'タップして しゃしんを えらぶ')),
@@ -907,7 +913,9 @@ function pageEditor(b, p){
     p.mediaId ? el('div', {class: 'fit-row'}, el('span', {}, 'みせかた'),
       el('div', {class: 'chips'},
         el('button', {class: 'chip' + (p.fit !== 'cover' ? ' on' : ''), onclick: () => { p.fit = 'contain'; saveBook(b); renderEdit(); }}, 'しゃしん ぜんたい'),
-        el('button', {class: 'chip' + (p.fit === 'cover' ? ' on' : ''), onclick: () => { p.fit = 'cover'; saveBook(b); renderEdit(); }}, 'わく いっぱい'))) : null,
+        el('button', {class: 'chip' + (p.fit === 'cover' ? ' on' : ''), onclick: () => { p.fit = 'cover'; saveBook(b); renderEdit(); }}, 'わく いっぱい'))) : null
+  ), el('section', {class: 'card'},
+    el('div', {class: 'pe-head'}, el('h3', {}, `${i + 1} ページめ の ことば`)),
     el('h4', {}, 'タイムライン（ことば と ま）'),
     tl,
     el('p', {class: 'note'}, '「ことば」に こえを つけると、さいせいの とき その もじが いろつきに なります。「ま」で ことばの あいだに じかんを あけられます（0.1秒 たんい）。'),
@@ -923,7 +931,7 @@ function pageEditor(b, p){
         p.items = textToItems(t); changed();
       }}, 'ぶんしょうを まとめて にゅうりょく')),
     el('div', {class: 'preview-row'}, prevBtn)
-  );
+  )];
 }
 
 /* =========================================================
@@ -936,7 +944,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && pl
 
 function showPlay(b){
   const v = $('#vPlay'); v.hidden = false;
-  pl = {book: b, entries: [{kind: 'cover'}, ...b.pages.map(p => ({kind: 'page', p})), {kind: 'end'}], idx: 0, reading: false, anim: false};
+  pl = {book: b, entries: [{kind: 'cover'}, ...b.pages.map(p => ({kind: 'page', p})), {kind: 'end'}], idx: 0, reading: false, anim: false, land: isLand()};
   const stage = el('div', {class: 'stage'});
   const readBtn = el('button', {class: 'read-btn', onclick: readCurrent}, 'おんどく');
   const prev = el('button', {class: 'nav prev', 'aria-label': 'もどる', onclick: () => turn(-1)}, el('span', {}, '‹'), el('small', {}, 'もどる'));
@@ -946,11 +954,12 @@ function showPlay(b){
     el('div', {class: 'p-top'},
       el('button', {class: 'icon-btn', 'aria-label': 'とじる', onclick: () => history.length > 1 ? history.back() : go('#/')}, '✕'),
       el('div', {class: 'p-title'}, b.title),
+      orientBtn(),
       el('label', {class: 'auto'}, el('input', {type: 'checkbox', checked: !!prefs.autoTurn, onchange: e => setPref('autoTurn', e.target.checked)}), 'じどうで めくる')),
     el('div', {class: 'p-main'}, prev, stage, next),
     el('div', {class: 'p-bottom'}, readBtn, ind)));
   Object.assign(pl, {stage, readBtn, prev, next, ind});
-  stage.append(buildSheet(pl.entries[0]));
+  renderCurrent();
   updateNav();
   // スワイプでも めくれる
   let sx = 0, sy = 0;
@@ -960,20 +969,42 @@ function showPlay(b){
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) turn(dx < 0 ? 1 : -1);
   });
   requestWake();
-  if (document.documentElement.requestFullscreen && !document.fullscreenElement)
-    document.documentElement.requestFullscreen({navigationUI: 'hide'}).catch(() => {});
+  applyOrientation(true);
 }
-function buildSheet(en){
+/* 絵（ひだり）と 文字（みぎ）を べつべつに つくる */
+function picPart(en){
   const b = pl.book;
-  if (en.kind === 'cover') return el('div', {class: 'sheet cover'}, pictureNode(coverSrc(b), ''),
-    el('div', {class: 'sheet-text'}, el('div', {class: 'cover-title'}, b.title || 'えほん'),
-      el('div', {class: 'phrases'}, el('span', {class: 'ph', 'data-id': '__open'}, 'はじまり はじまり'))));
-  if (en.kind === 'end'){ const cs = coverSrc(b); return el('div', {class: 'sheet end'}, pictureNode(cs.mediaId ? cs : {svg: sceneSVG(END_SCENE)}),
-    el('div', {class: 'sheet-text'}, el('div', {class: 'phrases big'}, el('span', {class: 'ph', 'data-id': '__end'}, 'おしまい')))); }
-  const texts = en.p.items.filter(i => i.type === 'text' && i.text.trim());
-  return el('div', {class: 'sheet'}, pictureNode(en.p),
-    el('div', {class: 'sheet-text'}, el('div', {class: 'phrases'}, texts.map(i => el('span', {class: 'ph', 'data-id': i.id}, i.text)))));
+  if (en.kind === 'cover') return pictureNode(coverSrc(b), '');
+  if (en.kind === 'end'){ const cs = coverSrc(b); return pictureNode(cs.mediaId ? cs : {svg: sceneSVG(END_SCENE)}); }
+  return pictureNode(en.p);
 }
+function textPart(en){
+  const b = pl.book;
+  if (en.kind === 'cover') return el('div', {class: 'sheet-text'}, el('div', {class: 'cover-title'}, b.title || 'えほん'),
+    el('div', {class: 'phrases'}, el('span', {class: 'ph', 'data-id': '__open'}, 'はじまり はじまり')));
+  if (en.kind === 'end') return el('div', {class: 'sheet-text'}, el('div', {class: 'phrases big'}, el('span', {class: 'ph', 'data-id': '__end'}, 'おしまい')));
+  const texts = en.p.items.filter(i => i.type === 'text' && i.text.trim());
+  return el('div', {class: 'sheet-text'}, el('div', {class: 'phrases'}, texts.map(i => el('span', {class: 'ph', 'data-id': i.id}, i.text))));
+}
+const kcls = en => 'k-' + en.kind;
+function buildSheet(en){ return el('div', {class: 'sheet ' + kcls(en)}, picPart(en), textPart(en)); }
+const half = (side, en, part) => el('div', {class: `half ${side} ${kcls(en)}`}, part);
+function buildSpread(L, R){
+  return el('div', {class: 'spread'}, half('left', L, picPart(L)), half('right', R, textPart(R)));
+}
+function renderCurrent(){
+  const en = pl.entries[pl.idx];
+  pl.stage.classList.toggle('land', pl.land);
+  pl.stage.replaceChildren(pl.land ? buildSpread(en, en) : buildSheet(en));
+}
+const landMQ = matchMedia('(orientation: landscape) and (min-width: 560px)');
+const isLand = () => landMQ.matches;
+landMQ.addEventListener('change', () => {
+  if (!pl || pl.land === isLand()) return;
+  if (pl.reading){ stopAudio(); setReading(false); }
+  pl.land = isLand();
+  if (!pl.anim) renderCurrent();
+});
 function entryItems(en){
   const b = pl.book;
   if (en.kind === 'cover') return [{id: '__open', type: 'text', text: 'はじまり はじまり', clipId: b.openingClipId}];
@@ -995,14 +1026,13 @@ async function readCurrent(){
   if (!pl || pl.reading || pl.anim) return;
   const me = pl, idx = pl.idx;
   setReading(true);
-  const sheet = pl.stage.querySelector('.sheet');
-  const find = id => sheet.querySelector(`[data-id="${CSS.escape(id)}"]`);
+  const find = id => pl && pl.stage.querySelector(`[data-id="${CSS.escape(id)}"]`);
   const ok = await playItems(entryItems(pl.entries[idx]), {
     onStart: it => { const s = find(it.id); if (s){ s.classList.add('now'); s.scrollIntoView({block: 'nearest', behavior: 'smooth'}); } },
     onEnd: it => { const s = find(it.id); if (s) s.classList.remove('now'); },
   });
-  sheet.querySelectorAll('.ph.now').forEach(s => s.classList.remove('now'));
   if (pl !== me) return;
+  pl.stage.querySelectorAll('.ph.now').forEach(s => s.classList.remove('now'));
   setReading(false);
   if (ok && prefs.autoTurn && idx < pl.entries.length - 1){
     await sleep(900);
@@ -1015,15 +1045,69 @@ async function turn(dir){
   if (ni < 0 || ni >= pl.entries.length) return;
   if (pl.reading){ stopAudio(); setReading(false); }
   pl.anim = true;
+  const cur = pl.entries[pl.idx], nx = pl.entries[ni];
+  if (pl.land){
+    /* 見開き：紙を 1まい めくる（おもて＝いまのページ、うら＝つぎのページ） */
+    let base, leaf;
+    if (dir > 0){
+      base = el('div', {class: 'spread'}, half('left', cur, picPart(cur)), half('right', nx, textPart(nx)));
+      leaf = el('div', {class: 'leaf to-left'},
+        el('div', {class: `face front half right ${kcls(cur)}`}, textPart(cur)),
+        el('div', {class: `face back half left ${kcls(nx)}`}, picPart(nx)));
+    } else {
+      base = el('div', {class: 'spread'}, half('left', nx, picPart(nx)), half('right', cur, textPart(cur)));
+      leaf = el('div', {class: 'leaf to-right'},
+        el('div', {class: `face front half left ${kcls(cur)}`}, picPart(cur)),
+        el('div', {class: `face back half right ${kcls(nx)}`}, textPart(nx)));
+    }
+    pl.stage.replaceChildren(base, leaf);
+    pl.idx = ni; updateNav();
+    await sleep(850);
+    if (!pl) return;
+    pl.anim = false;
+    renderCurrent();
+    return;
+  }
   const old = pl.stage.querySelector('.sheet');
-  const nw = buildSheet(pl.entries[ni]);
+  const nw = buildSheet(nx);
   if (dir > 0){ pl.stage.insertBefore(nw, old); old.classList.add('turn-out'); }
   else { pl.stage.append(nw); nw.classList.add('turn-in'); }
   pl.idx = ni; updateNav();
   await sleep(720);
+  if (!pl) return;
   old.remove(); nw.classList.remove('turn-in');
   pl.anim = false;
+  if (pl.land) renderCurrent();
 }
+
+/* ===== 画面の向き（じぶんで えらぶ） ===== */
+const wantLand = () => prefs.orient === 'landscape';
+async function applyOrientation(allowFs){
+  const so = screen.orientation;
+  if (!so || !so.lock) return false;
+  const o = wantLand() ? 'landscape' : 'portrait';
+  try{ await so.lock(o); return true; }catch(e){}
+  if ((allowFs || wantLand()) && !document.fullscreenElement && document.documentElement.requestFullscreen){
+    try{ await document.documentElement.requestFullscreen({navigationUI: 'hide'}); }catch(e){ return false; }
+    try{ await so.lock(o); return true; }catch(e){}
+  }
+  return false;
+}
+const orientLabel = () => wantLand() ? '↻ たてに する' : '↻ よこに する';
+function orientBtn(){ return el('button', {class: 'orient-btn', onclick: toggleOrientation}, orientLabel()); }
+async function toggleOrientation(){
+  setPref('orient', wantLand() ? 'portrait' : 'landscape');
+  document.querySelectorAll('.orient-btn').forEach(x => x.textContent = orientLabel());
+  const ok = await applyOrientation(true);
+  if (!ok && wantLand() !== isLand()) toast(`スマホを ${wantLand() ? 'よこ' : 'たて'}に むけてください`, 3000);
+}
+document.addEventListener('fullscreenchange', () => {
+  // もどる そうさで 全画面が おわったら、たてに もどる
+  if (!document.fullscreenElement && wantLand()){
+    setPref('orient', 'portrait');
+    document.querySelectorAll('.orient-btn').forEach(x => x.textContent = orientLabel());
+  }
+});
 
 /* =========================================================
    せってい（バックアップ）

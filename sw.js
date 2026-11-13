@@ -1,5 +1,5 @@
 // えほんアプリ Service Worker（オフライン対応）
-const CACHE = 'ehon-v2';
+const CACHE = 'ehon-v3';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './style.css', './app.js', './templates.js'];
 
 self.addEventListener('install', e => {
