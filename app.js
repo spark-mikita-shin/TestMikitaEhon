@@ -144,22 +144,33 @@ function ac(){
   if (AC.state === 'suspended') AC.resume();
   return AC;
 }
-let playToken = 0, curAudio = null;
+/* iPhoneでは 1つの audio を つかいまわすと、2つめ いこうの こえも ながれる */
+let playToken = 0, curDone = null;
+const AUD = new Audio();
+AUD.preload = 'auto';
 function stopAudio(){
   playToken++;
-  if (curAudio){ const a = curAudio; curAudio = null; a.pause(); }
+  AUD.pause();
+  if (curDone){ const d = curDone; curDone = null; d(); }
   document.querySelectorAll('.play-mini.on').forEach(b => { b.classList.remove('on'); b.textContent = '▶'; });
 }
 function playBlob(blob, token){
+  if (curDone){ const d = curDone; curDone = null; d(); }
   return new Promise(res => {
     const url = URL.createObjectURL(blob);
-    const a = new Audio(url);
-    curAudio = a;
     let fin = false;
-    const done = () => { if (fin) return; fin = true; URL.revokeObjectURL(url); if (curAudio === a) curAudio = null; res(); };
-    a.onended = done; a.onerror = done;
-    a.onpause = () => { if (token !== playToken) done(); };
-    a.play().catch(done);
+    const done = () => {
+      if (fin) return; fin = true;
+      if (curDone === done) curDone = null;
+      AUD.onended = AUD.onerror = null;
+      URL.revokeObjectURL(url);
+      res();
+    };
+    curDone = done;
+    AUD.onended = done; AUD.onerror = done;
+    AUD.src = url;
+    const pr = AUD.play();
+    if (pr) pr.catch(() => { if (token === playToken) done(); });
   });
 }
 const estDur = text => Math.max(0.7, [...(text || '')].length * 0.17);
@@ -338,6 +349,7 @@ function bookGrid(mode){
 function bookMenu(b){
   menuBox(b.title || 'えほん', [
     ['よむ（さいせい）', () => go('#/play/' + b.id)],
+    ['どうが（MP4）に かきだす', () => openVideoExport(b)],
     ['ふくせいする', async () => {
       const c = JSON.parse(JSON.stringify(b));
       c.id = uid(); c.title = (b.title || 'えほん') + '（コピー）'; c.created = c.updated = Date.now();
@@ -752,7 +764,8 @@ function bookSettingsCard(b){
     el('div', {class: 'cover-row'},
       el('div', {class: 'cover-thumb', onclick: () => coverMenu(b)}, pictureNode(coverSrc(b), b.title), el('span', {class: 'cover-tag'}, 'サムネイルを かえる')),
       el('div', {class: 'voice-sets'}, voiceRow('openingClipId', 'opening', 'はじまりはじまり'), voiceRow('endingClipId', 'ending', 'おしまい'))),
-    el('p', {class: 'note'}, 'さいせいの とき、ひょうしで「はじまりはじまり」、さいごに「おしまい」の こえが ながれます。'));
+    el('p', {class: 'note'}, 'さいせいの とき、ひょうしで「はじまりはじまり」、さいごに「おしまい」の こえが ながれます。'),
+    el('div', {class: 'row-btns'}, el('button', {class: 'btn small', onclick: () => openVideoExport(b)}, 'どうが（MP4）に かきだす')));
 }
 function coverMenu(b){
   menuBox('サムネイル（ひょうし）', [
@@ -1093,7 +1106,7 @@ async function applyOrientation(allowFs){
   }
   return false;
 }
-const orientLabel = () => wantLand() ? '↻ たてに する' : '↻ よこに する';
+const orientLabel = () => wantLand() ? '↻ たて' : '↻ よこ';
 function orientBtn(){ return el('button', {class: 'orient-btn', onclick: toggleOrientation}, orientLabel()); }
 async function toggleOrientation(){
   setPref('orient', wantLand() ? 'portrait' : 'landscape');

@@ -256,3 +256,15 @@ dialog{overflow:auto}
   .pe-pic{max-width:calc(52vh * 4 / 3);margin-left:auto;margin-right:auto}
   .wave{height:100px}
 }
+
+/* どうが かきだし */
+.vcanvas{display:block;width:100%;height:auto;border-radius:12px;background:#e9d5b5;margin:6px 0}
+.vcanvas.tall{width:auto;max-width:100%;max-height:52vh;margin:6px auto}
+.vbar{height:12px;border-radius:999px;background:#f3e6d4;overflow:hidden;margin-top:8px}
+.vbar-in{height:100%;width:0;background:var(--accent);transition:width .2s}
+.vtime{text-align:center;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+.vinfo{font-size:13px;color:var(--text);background:#fff7ec;border-radius:10px;padding:8px 12px;margin:10px 0;line-height:1.7}
+.warn{font-size:13px;color:#b42318;background:#fff1f0;border-radius:10px;padding:8px 12px;line-height:1.6}
+.chk-row{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-top:12px}
+.chk-row input{width:20px;height:20px;accent-color:var(--accent)}
+.vprev{display:block;width:100%;max-height:50vh;border-radius:12px;background:#000;margin:6px 0}
